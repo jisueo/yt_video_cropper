@@ -1,46 +1,102 @@
 import cv2
-from datetime import datetime
+from tqdm import tqdm
 
 
-def crop(video_file_path: str, start_time: str = None, end_time: str = None):
-    filename = video_file_path  # filename
-    cap = cv2.VideoCapture(filename)  # Read Frame
-    fps = cap.get(cv2.CAP_PROP_FPS)  # Extract the frame per second (fps)
+class VideoCroping:
 
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))  # height
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))  # width
+    __show_progress = False
+    __show_frames = False
 
-    origin = "00:00:00"  # the origin
-    start = "00:00:20"  # specify start time in hh:mm:ss
-    end = "00:00:30"  # specify end time in hh:mm:ss
+    def __init__(self, show_progress=False, show_frames=False) -> None:
+        """init cropping video module
+        Args:
+            show_progress: True or False, default False, if you want to se progress bar on screen, set True
+            show_frame: True or False, default False, if you want to see video frame on screen, set True
+        """
+        self.__show_progress = show_progress
+        self.__show_frames = show_frames
 
-    origintime = datetime.strptime(origin, "%H:%M:%S")  # origin
-    starttime = datetime.strptime(start, "%H:%M:%S")  # start time
-    endtime = datetime.strptime(end, "%H:%M:%S")  # end time
+    def crop(
+        self,
+        video_file_path: str,
+        out: str = None,
+        out_file_name: str = None,
+        start_time: int = None,
+        end_time: str = None,
+        width=None,
+        height=None,
+        crop=False,
+    ):
+        """Get channel info from video id
+        Args:
+            video_file_path(str): video file path
+            start_time(int): video capture start second
+            end_time(int): video capture end second
+            width(int): output Width
+            height(int): output Height
+            crop: out put crop if w/h rate dose not fit into origin size
+        Returns:
+            None
+        Exception:
+            raise NotFoundFile
+            raise OpenCV Error raise
+        """
+        try:
+            if out is None and out_file_name is None:
+                out = "output.mp4"
+            else:
+                out = f"{out}/{out_file_name}"
+            print(out)
+            file_name = video_file_path
+            cap = cv2.VideoCapture(file_name)
+            fps = cap.get(cv2.CAP_PROP_FPS)
 
-    startframe = fps * (starttime - origintime).total_seconds()  # get the start frame
-    endframe = fps * (endtime - origintime).total_seconds()  # get the end frame
+            origin_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            origin_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 
-    # video writer
-    fourcc = cv2.VideoWriter_fourcc(*"XVID")
-    out1 = cv2.VideoWriter("output.avi", fourcc, fps, (width, height))
+            if width is None or height is None:
+                height = origin_height
+                width = origin_width
 
-    counter = 1  # set counter
-    while cap.isOpened():  # while the cap is open
+            start_frame = fps * start_time
+            end_frame = fps * (end_time - start_time)
 
-        ret, frame = cap.read()  # read frame
-        if frame is None:  # if frame is None
-            break
+            video_cropping_progress = None
+            if self.__show_progress:
+                video_cropping_progress = tqdm(total=end_frame, desc="Cropping Video :")
 
-        frame = cv2.resize(frame, (width, height))  # resize the frame
-        if counter >= startframe and counter <= endframe:  # check for range of output
-            out1.write(frame)  # output
+            # set start frame, video skip to start frame
+            cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
 
-        cv2.imshow("Frame", frame)  # display frame
-        key = cv2.waitKey(1) & 0xFF
+            # make output video writer
+            fourcc = cv2.VideoWriter_fourcc(*"FMP4")
+            out_video = cv2.VideoWriter(out, fourcc, fps, (width, height))
 
-        counter += 1  # increase counter
+            counter = 1  # set counter
 
-    # release the output and cap
-    out1.release()
-    cv2.destroyAllWindows()
+            while cap.isOpened():  # while the cap is open
+                __, frame = cap.read()  # read frame
+                if frame is None:  # if frame is None
+                    break
+                if crop == False:
+                    frame = cv2.resize(frame, (width, height))  # resize the frame
+                else:
+                    left = (origin_width - width) / 2
+                    right = (origin_width - width) / 2 + width
+                    top = (origin_height - height) / 2
+                    bottom = (origin_height - height) / 2 + height
+                    frame[top:bottom, left:right]
+                if counter <= end_frame:  # check for range of output
+                    out_video.write(frame)  # output
+                else:
+                    break;
+                if self.__show_frames:
+                    cv2.imshow("Frame", frame)  # display frame
+                counter += 1
+                if video_cropping_progress is not None:
+                    video_cropping_progress.update(1)
+
+            out_video.release()
+            cv2.destroyAllWindows()
+        except Exception as e:
+            raise e
