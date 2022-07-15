@@ -57,7 +57,6 @@ class VideoCroping:
             if width is None or height is None:
                 height = origin_height
                 width = origin_width
-
             start_frame = fps * start_time
             end_frame = fps * (end_time - start_time)
 
@@ -89,7 +88,7 @@ class VideoCroping:
                 if counter <= end_frame:  # check for range of output
                     out_video.write(frame)  # output
                 else:
-                    break;
+                    break
                 if self.__show_frames:
                     cv2.imshow("Frame", frame)  # display frame
                 counter += 1

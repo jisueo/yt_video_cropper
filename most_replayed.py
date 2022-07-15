@@ -3,8 +3,9 @@ import re
 import json
 from urllib import parse
 
-VIDEO_URL = "https://www.youtube.com/watch?v="
+VIDEO_URL = "https://www.youtube.com/watch?hl=en&v="
 YOUTUBE_INIT_VARIABLE_NAME = "ytInitialData"
+# [{"timedMarkerDecorationRenderer":{"visibleTimeRangeStartMillis":19651940,"visibleTimeRangeEndMillis":20253530,"decorationTimeMillis":19852470,"label":{"runs":[{"text":"가장 많이 다시 본 장면"}]
 
 
 class MostReplayedHeatMap:
@@ -21,18 +22,35 @@ class MostReplayedHeatMap:
             total += marker["heatMarkerRenderer"]["heatMarkerIntensityScoreNormalized"]
         return total
 
+    def extract_most_replayed_term(self):
+        try:
+            data = self.extract_heatmap_data()
+            heat_markers_decos = data["heatMarkersDecorations"]
+            for deco in heat_markers_decos:
+                timeMarker = deco.get("timedMarkerDecorationRenderer", {})
+                if timeMarker is not None:
+                    if timeMarker.get("label") is not None:
+                        texts = timeMarker.get("label", {}).get("runs")
+                        for text in texts:
+                            if text.get("text") == "Most replayed":
+                                return (
+                                    timeMarker["visibleTimeRangeStartMillis"],
+                                    timeMarker["visibleTimeRangeEndMillis"],
+                                    timeMarker["decorationTimeMillis"],
+                                )
+            return None
+        except Exception as e:
+            return None
+
     def normalized_range_data(self, data):
-        # 기본적으로 구간 당 10초가 넘어가야 구간으로 인정 한다.
-        # 각각의 머지해버린다.
-        # 무조건 100개가 있어야 하기 때문에, 몇개씩 머지 해야 되는지 확인 해 본다.
+        # 기본적으로 3개 구간을 사용하는 것으로 파악 된다.
         heat_markers = data["heatMarkers"]
-        heat_markers = heat_markers[1:99]
         heat_markers_len = len(heat_markers)
 
         time_unit = heat_markers[0]["heatMarkerRenderer"]["markerDurationMillis"]
 
         # count_unit만큼씩 머지 한다.
-        count_unit = int(10000 / time_unit) + int(1 if 10000 % time_unit > 0 else 0)
+        count_unit = 3
 
         new_heatmap = []
         for index, marker in enumerate(heat_markers):
@@ -58,6 +76,12 @@ class MostReplayedHeatMap:
                 }
             )
         return new_heatmap
+
+    def extract_visual_normalized_heatmap_data(self):
+        try:
+            return self.normalized_range_data(self.extract_heatmap_data())
+        except Exception as e:
+            raise e
 
     def extract_heatmap_data(self):
         try:
@@ -92,13 +116,12 @@ class MostReplayedHeatMap:
                             marker.get("value") is not None
                             and marker.get("value", {}).get("heatmap") is not None
                         ):
-
-                            return self.normalized_range_data(
-                                (
-                                    marker.get("value", {})
-                                    .get("heatmap", {})
-                                    .get("heatmapRenderer")
-                                )
+                            return (
+                                marker.get("value", {})
+                                .get("heatmap", {})
+                                .get("heatmapRenderer")
                             )
+
+                    return None
         except Exception as e:
             raise e

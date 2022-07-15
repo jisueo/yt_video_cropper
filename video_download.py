@@ -34,17 +34,16 @@ class VideoDownloader:
     def __complete_callback(self, stream: Stream = None, msg: str = None):
         self.__video_download_pbar.update(100)
 
-    def download(
-        self, video_id: str, download_foler, file_name=None, show_progress=False
-    ) -> str:
+    def download(self, video_id: str, download_foler, file_name=None) -> str:
         try:
             video_url = f"https://www.youtube.com/watch?v={video_id}"
+            print(video_url)
             youtube_video = YouTube(
                 video_url,
                 on_complete_callback=lambda stream, msg: self.__complete_callback(
                     stream, msg
                 )
-                if show_progress
+                if self.__show_progress
                 else None,
                 on_progress_callback=lambda stream, chunk, remaining: self.__download_procegress_callback(
                     stream, chunk, remaining

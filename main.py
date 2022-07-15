@@ -77,8 +77,11 @@ def get_video_highlite_term(args):
         heat_minute = True
 
     mr = MostReplayedHeatMap(video_id)
-    result = mr.extract_heatmap_data()
 
+    heat_mil_start, heat_mil_end, _ = mr.extract_most_replayed_term()
+    print(heat_mil_start, heat_mil_end)
+
+    """
     bigest_maker = None
     for marker in result:
         if bigest_maker is None:
@@ -104,7 +107,10 @@ def get_video_highlite_term(args):
 
         heat_min_start = start_second
         heat_min_end = end_second
-        return heat_min_start, heat_min_end
+    """
+    heat_min_start = int(heat_mil_start / 1000)
+    heat_min_end = int(heat_mil_end / 1000)
+    return heat_min_start, heat_min_end
 
 
 def crop_video(args):
@@ -118,8 +124,11 @@ def crop_video(args):
     start = None
     end = None
 
+    width = None
+    height = None
+
     plugs = []
-    if args.plugins:
+    if args.plugins is not None:
         plugs = args.plugins.split("|")
 
     for plug in plugs:
@@ -128,20 +137,26 @@ def crop_video(args):
             args.start = start_second
             args.end = end_second
 
-    if args.file:
+    if args.file is not None:
         file_path = args.file
 
-    if args.progress:
+    if args.progress is not None:
         progressbar = True
 
-    if args.frame:
+    if args.frame is not None:
         frame = True
 
-    if args.start:
+    if args.start is not None:
         start = int(args.start)
 
-    if args.end:
+    if args.end is not None:
         end = int(args.end)
+
+    if args.width is not None:
+        width = int(args.width)
+
+    if args.height is not None:
+        height = int(args.height)
 
     if args.out:
         out = args.out
@@ -184,21 +199,27 @@ def download_video(args):
 
     if args.plugins:
         plugs = args.plugins.split("|")
+        args.plugins = None
 
     video_download = VideoDownloader(progressbar)
+    download_file_path = video_download.download(video_id, out)
 
     start_second = None
     end_second = None
     for plug in plugs:
         if plug == "t":
+            print("start get term")
             start_second, end_second = get_video_highlite_term(args)
             args.start = start_second
             args.end = end_second
         if plug == "c":
+            print("start extract highlight")
+            print("start extract highlight start, end", args.start, args.end)
+
             if args.outfile is None:
                 args.outfile = f"{video_id}_HL.mp4"
             if args.file is None:
-                args.file = f"{out}/{video_id}_HL.mp4"
+                args.file = f"{out}/{video_id}.mp4"
 
             crop_video(args)
 
