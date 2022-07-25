@@ -1,5 +1,8 @@
 import cv2
 from tqdm import tqdm
+from skimage.metrics import structural_similarity
+import cv2
+import numpy as np
 
 
 class VideoCroping:
@@ -15,6 +18,52 @@ class VideoCroping:
         """
         self.__show_progress = show_progress
         self.__show_frames = show_frames
+
+    def image_similarity(self, origin_image_path, compare_image_path):
+        """init cropping video module
+        Ref:
+            https://stackoverflow.com/questions/11541154/checking-images-for-similarity-with-opencv
+        Args:
+            origin_image_path: original image
+            compare_image_path: compare image
+        """
+        first = cv2.imread(origin_image_path)
+        second = cv2.imread(compare_image_path)
+
+        # Convert images to grayscale
+        first_gray = cv2.cvtColor(first, cv2.COLOR_BGR2GRAY)
+        second_gray = cv2.cvtColor(second, cv2.COLOR_BGR2GRAY)
+
+        # Compute SSIM between two images
+        score, diff = structural_similarity(first_gray, second_gray, full=True)
+        return score * 100, (diff * 255).astype("uint8")
+
+    def capture (self, video_file_path: str, out: str = None, times: list[int] = None):
+        try:
+            file_name = video_file_path
+            cap = cv2.VideoCapture(file_name)
+            fps = cap.get(cv2.CAP_PROP_FPS)
+
+            video_cropping_progress = None
+            if self.__show_progress:
+                video_cropping_progress = tqdm(total=len(times), desc="Capture Video Frames Count:")
+
+            counter = 1  # set counter
+            for index, time in enumerate(times):
+                capture_frame = fps * time
+                cap.set(cv2.CAP_PROP_POS_FRAMES, capture_frame)
+                success, frame = cap.read()
+                outfile = f"{out}/{index}.jpg"
+                if success:
+                    cv2.imwrite(outfile,frame)
+                if self.__show_frames:
+                    cv2.imshow("Frame", frame)  # display frame
+                if video_cropping_progress is not None:
+                    video_cropping_progress.update(1)
+                    
+            cv2.destroyAllWindows()
+        except Exception as e:
+            raise e
 
     def crop(
         self,
@@ -94,7 +143,6 @@ class VideoCroping:
                 counter += 1
                 if video_cropping_progress is not None:
                     video_cropping_progress.update(1)
-
             out_video.release()
             cv2.destroyAllWindows()
         except Exception as e:

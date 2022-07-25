@@ -28,7 +28,7 @@ pytube, open cv를 이용하여, most replayed 구간만 추출하는 기능을 
 ### download and most replayed 추출
 
 ```bash
-python main.py --out=./downloads  --type=k --progress --vid=EAPP_2kxsMU
+python main.py --out=./downloads  --type=k --progress --vid=GrAYU37dJ8s
 ```
 
 -   type: k -> download, most replay 추출, most replay 구간 추출을 순서대로 진행
@@ -63,6 +63,12 @@ python main.py --out=./downloads --outfile="test2.mp4"  --file=./downloads/GnrU_
     -   start=15, end=60 이고 GnrU_i1qTgU.mp4 이 2분자리 동영상이면
     -   GnrU_i1qTgU.mp4 15초 부터 60초까지 부분만 짤라 동영상으로 저장 한다.
 -   end: 추출을 끝낼 시간(second)
+
+### video upload Google Storage
+
+```bash
+python main.py --out=./downloads  --type=s --gs --progress --vid=GrAYU37dJ8s --frame
+```
 
 ## Running the tests
 

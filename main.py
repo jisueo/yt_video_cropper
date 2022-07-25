@@ -1,9 +1,15 @@
 import sys
-import json
+import os
 import argparse
 from video_download import VideoDownloader
 from video_crop import VideoCroping
 from most_replayed import MostReplayedHeatMap
+from gs_uploader import upload_file
+from shot_detections import analyze_shots_offset
+from shutil import copyfile
+from vision import vision_processing
+import pathlib
+import json
 
 parser = argparse.ArgumentParser(description="Test opetions")
 
@@ -15,7 +21,7 @@ parser = argparse.ArgumentParser(description="Test opetions")
 
     Typical usage example:
 
-    config = Configs()ß
+    config = Configs()
     credential = config.get_attr('CREDENTIAL')
 
     credential = Configs.instance().get_attr('CREDENTIAL')
@@ -33,11 +39,14 @@ parser.add_argument(
 parser.add_argument("--out", required=False, help="video out folder")
 parser.add_argument("--outfile", required=False, help="video out file name")
 parser.add_argument("--vid", required=False, help="video id")
-parser.add_argument("--file", required=False, help="video id")
+parser.add_argument("--file", required=False, help="video file")
+parser.add_argument("--json", required=False, help="make json result file", action="store_true")
 parser.add_argument("--start", required=False, help="video crop start time(second)")
 parser.add_argument("--end", required=False, help="video crop end time(second")
 parser.add_argument("--width", required=False, help="video crop start time(second)")
 parser.add_argument("--height", required=False, help="video crop end time(second")
+parser.add_argument("--images", required=False, help="Images location folder path")
+parser.add_argument("--threshold", required=False, help="Images similarity threshold")
 parser.add_argument(
     "--progress", required=False, help="show progressbar", action="store_true"
 )
@@ -53,9 +62,21 @@ parser.add_argument(
     help="show video frame on progressing",
     action="store_true",
 )
+parser.add_argument(
+    "--gs",
+    required=False,
+    help="store download video google storage",
+    action="store_true",
+)
+
+parser.add_argument(
+    "--sd",
+    required=False,
+    help="video shot detection",
+    action="store_true",
+)
 
 args = parser.parse_args()
-
 
 def get_video_highlite_term(args):
 
@@ -203,9 +224,12 @@ def download_video(args):
 
     video_download = VideoDownloader(progressbar)
     download_file_path = video_download.download(video_id, out)
-
+    if args.gs:
+        upload_file(download_file_path)
+    
     start_second = None
     end_second = None
+
     for plug in plugs:
         if plug == "t":
             print("start get term")
@@ -223,8 +247,74 @@ def download_video(args):
 
             crop_video(args)
 
+def shot_detect_video(args):
+    video_id = None
+    if args.vid:
+        video_id = args.vid
+    
+    file_path = None
+    if args.file is not None:
+        file_path = args.file
+    else:
+        file_path = f"./downloads/{video_id}.mp4"
 
+    out = None
+    if args.out is not None:
+        out = args.out
+
+    json = None
+    if args.json is not None:
+        json = True
+
+    if video_id is not None:
+        offset_datas = analyze_shots_offset(video_id)
+        times = list(map(lambda x:x["time"], offset_datas))
+        progress = False
+        if args.progress:
+            progressbar = True
+        frame = False
+        if args.frame is not None:
+            frame = True
+        vc = VideoCroping(progress, frame)
+        vc.capture(file_path, f"{out}/{video_id}", times)
+
+def simularity_image_remove(args):
+    out = None
+    if args.out is not None:
+        out = args.out
+
+    image_folder = None
+    if args.images is not None:
+        image_folder = args.images
+
+    score_threshold = 75
+    if args.threshold is not None:
+        score_threshold = int(args.threshold)
+        
+    image_files = [f for f in os.listdir(image_folder) if os.path.isfile(os.path.join(image_folder, f))]
+    file_path_list = list(map(lambda x:f"{image_folder}/{x}" ,image_files))
+    file_path_list = list(filter(lambda x: pathlib.Path(x).suffix == ".jpg", file_path_list))
+    vc = VideoCroping()
+    results = []
+    for file_path in file_path_list:
+        results.append(file_path)
+        print("file_path_list len: ", len(file_path_list))
+        file_path_list.remove(file_path)
+        for file_compare in file_path_list:
+            if file_path != file_compare:
+                score, _ = vc.image_similarity(file_path, file_compare)
+                if score > score_threshold:
+                    print("find remove file:", file_compare)
+                    file_path_list.remove(file_compare)
+    print(file_path_list)
+    
+    for pure in results:
+        copyfile(pure, f"{out}/{os.path.basename(pure)}")
+
+        
+    
 def main(argv):
+    print(argv)
     if args.type == "d":
         download_video(args)
     if args.type == "c":
@@ -232,6 +322,14 @@ def main(argv):
     if args.type == "k":
         args.plugins = "t|c"
         download_video(args)
+    if args.type == "s":
+        shot_detect_video(args)
+    if args.type == "i":
+        simularity_image_remove(args)
+    if args.type == "f":
+        result = vision_processing("public_videos_samples", "test")
+        with open("./downloads/result22.json", 'w') as outfile:
+            json.dump(result, outfile)
 
 
 if __name__ == "__main__":
